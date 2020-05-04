@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
+from Token_get import getToken
 
-TOKEN = 'NzA0NDU0NDUwMzg2ODI5NTQz.Xqdaog.kEnFJzRqSP00IGRXMSmtdMNNQsk'
 bot = commands.Bot(command_prefix='!')
 
 
@@ -41,4 +41,4 @@ async def ban(ctx, members: commands.Greedy[discord.Member],
     for member in members:
         await member.ban(delete_message_days=delete_days, reason=reason)
 
-bot.run(TOKEN)
+bot.run(getToken())
