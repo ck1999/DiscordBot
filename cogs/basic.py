@@ -88,7 +88,7 @@ class Basic(commands.Cog, name='Basic'):
             if not user.bot:
                 await update_data('users', user, guild.id)
 
-        await guild.owner.send('')
+        await guild.owner.send('Oops. Sorry for spam! I will be add something here later! Chao!\n(C) ck1999')
         
     @commands.Cog.listener()
     async def on_command_error(self, error):
