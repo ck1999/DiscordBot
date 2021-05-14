@@ -144,4 +144,3 @@ cython_debug/
 users.json
 
 cogs/json_data/
-config.py
