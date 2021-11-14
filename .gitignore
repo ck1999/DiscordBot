@@ -142,6 +142,4 @@ cython_debug/
 
 #Data files
 users.json
-
-cogs/json_data/
-config.py
+ffmpeg.exe

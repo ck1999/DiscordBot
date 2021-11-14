@@ -1,16 +1,15 @@
 import os, discord
 from discord.ext import commands
+from cogs.settings import settings
+import requests
 
-import config
+intents = discord.Intents(guilds=True, messages=True, members=True, voice_states=True, bans=True)
 
-intents = discord.Intents.default()
-intents.members = True
-
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix=">", intents=intents)
 
 for filename in os.listdir('./cogs'):
     if filename.endswith('.py'):
         bot.load_extension(f'cogs.{filename[:-3]}')
         print(f'{filename[:-3]} loaded')
 
-bot.run(config.settings['token'])
+bot.run(settings['token'])

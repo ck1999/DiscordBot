@@ -1,117 +1,115 @@
-import discord, json
-from discord import player
+import discord, requests
 from discord.ext import commands
+from .settings import settings
 
-async def open_json(name):
-    with open(name, 'r') as f:
-        return json.load(f)
+class NotEnoughMoney(Exception):
+    pass
 
-async def save_data(array,name):
-    with open(name, 'w') as f:
-        json.dump(array, f)
-
-async def update_data(filename, user, id):
-    path = 'cogs/json_data/{}/{}.json'.format(id,filename)
-    array = await open_json(path)
-    if not f'{user.id}' in array:
-        array[f'{user.id}'] = {}
-        if filename == 'bank':
-            array[f'{user.id}']['amount'] = 0
-    await save_data(array, path)
-  
 class BankSystem(commands.Cog, name='Экономика'):
     
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(enabled=False)
+    @commands.command(aliases=['balance', 'bal'], description="Проверить количество фисташек на руках")
+    @commands.cooldown(1, settings.get('cooldown_medium'), commands.BucketType.user)
     @commands.guild_only()
-    async def fis(self, ctx, member: discord.Member = None):
-        id = ctx.guild.id
-        path = 'cogs/json_data/{}/users.json'.format(id)
+    async def fis(self, ctx: commands.Context, member: discord.Member = None):
+        request = requests.get(settings.get('api')+f'guilds/{ctx.guild.id}')
+        if not request.json().get('setting_plugin_economy'):
+            return
         user = member or ctx.message.author
-        users = await open_json(path)
-        await ctx.reply('У {} уже целых {} фисташек!'.format(user.mention, users[f'{user.id}']['cookies']))
+        if user.bot:
+            return await ctx.reply('Боты не играют в наши игры...')
+        request = requests.get(settings.get('api')+f'{ctx.guild.id}/{user.id}')
+        return await ctx.reply('У {} уже целых {} фисташек!'.format(user.mention, request.json()['balance']))
 
-    @commands.command(description="Отправить фисташки другому пользователю\nПример команды: !pay @ck1999 10")
+    @commands.command(aliases=['transfer'], description="Отправить фисташки другому пользователю\nПример команды: !pay @ck1999 10")
+    @commands.cooldown(1, settings.get('cooldown_medium'), commands.BucketType.user)
     @commands.guild_only()
-    async def pay(self, ctx, member: discord.Member = None, amount: int = 10):
-        guild_id = ctx.guild.id
-        path = 'cogs/json_data/{}/users.json'.format(guild_id)
-        user = member
+    async def pay(self, ctx: commands.Context, member: discord.Member = None, amount: int = 10):
+        request = requests.get(settings.get('api')+f'guilds/{ctx.guild.id}')
+        if not request.json().get('setting_plugin_economy'):
+            return
+        if member is None:
+            return
         if member == ctx.author or member.bot:
-            raise commands.MemberNotFound
-        id = user.id
-        users = await open_json(path)
-        users[str(id)]['cookies'] += int(amount*(87/100))
-        users[f'{ctx.author.id}']['cookies'] -= amount
+            return await ctx.reply('А кому отправлять деньги? Непонятно...')
+        if amount < 0:
+            return await ctx.reply('Может тогда ты сам попросишь его отправить деньги?')
+        request = requests.get(settings.get('api')+f'{ctx.guild.id}/{ctx.author.id}')
+        __user_one_balance = request.json().get('balance') - amount
+        if __user_one_balance < 0:
+            return await ctx.reply('У тебя нет такой большой суммы денег...')
+        context = {
+                'balance': __user_one_balance,
+            }
+        requests.put(settings.get('api')+f'{ctx.guild.id}/{ctx.author.id}', data=context)
+        request = requests.get(settings.get('api')+f'{ctx.guild.id}/{member.id}')
+        __user_two_balance = request.json().get('balance') + int(amount*(87/100))
+        context = {
+                'balance': __user_two_balance,
+            }
+        request = requests.put(settings.get('api')+f'{ctx.guild.id}/{member.id}', data=context)
         embed = discord.Embed(title='Чек', color=0xff5555)
         embed.add_field(name='**Сумма:**', value=int(amount*(87/100)), inline=False)
-        embed.add_field(name='**Получатель:**', value=user.mention, inline=False)
+        embed.add_field(name='**Получатель:**', value=member.mention, inline=False)
         embed.add_field(name='**Налог:**', value=amount-int(amount*(87/100)), inline=False)
-        await ctx.reply(embed=embed)
-        await save_data(users, path)
+        return await ctx.reply(embed=embed)
 
-    @pay.error
-    async def pay_error(self, ctx, error):
-        if isinstance(error, commands.MemberNotFound):
-            await ctx.reply('Укажи пользователя, которому хочешь перевести свои фисташки!')
-
-    @commands.command(aliases=['dep', 'put'],description="Положить деньги в банк\nПример команды: !dep 10")
+    @commands.command(aliases=['dep', 'put'], description="Положить деньги в банк\nПример команды: !dep 10")
+    @commands.cooldown(1, settings.get('cooldown_medium'), commands.BucketType.user)
     @commands.guild_only()
-    async def deposit(self, ctx, amount: int):
-        id = ctx.guild.id
-        path_users = 'cogs/json_data/{}/users.json'.format(id)
-        path_bank = 'cogs/json_data/{}/bank.json'.format(id)
-        user = ctx.author
-        await update_data('bank', user, id)
-        users = await open_json(path_users)
-        bank = await open_json(path_bank)
-        if users[f'{user.id}']['cookies'] - amount >= 0:
-            bank[f'{user.id}']['amount'] += amount
-            users[f'{user.id}']['cookies'] -= amount 
-            embed = discord.Embed(title='Чек', color=0xff5555)
-            embed.add_field(name='**Сумма:**', value=amount, inline=False)
-            embed.add_field(name='**Налог:**', value=0, inline=False) 
-            await ctx.reply(embed=embed)
-        await save_data(users, path_users)
-        await save_data(bank, path_bank)
+    async def deposit(self, ctx: commands.Context, amount: int):
+        request = requests.get(settings.get('api')+f'guilds/{ctx.guild.id}')
+        if not request.json()['setting_plugin_economy']:
+            return
+        if amount <= 0:
+            return await ctx.reply('Хорошая попытка, но кредитный отдел в здании напротив!')
+        request = requests.get(settings.get('api')+f'{ctx.guild.id}/{ctx.author.id}')
+        if request.json().get('balance') < amount:
+            return await ctx.reply('Извините меня, но у вас нет такой суммы на руках.')
+        context = {
+            'balance': request.json().get('balance') - amount,
+            'bank': request.json().get('bank') + amount
+        }
+        requests.put(settings.get('api')+f'{ctx.guild.id}/{ctx.author.id}', data=context)
+        embed = discord.Embed(title='Чек', color=0xff5555)
+        embed.add_field(name='**Сумма:**', value=amount, inline=False)
+        return await ctx.reply(embed=embed)
 
-    @commands.command(aliases=['with','take'],description="Забрать деньги из банка\nПример команды: !take 10")
+    @commands.command(aliases=['with','take'], description="Забрать деньги из банка\nПример команды: !take 10")
+    @commands.cooldown(1, settings.get('cooldown_medium'), commands.BucketType.user)
     @commands.guild_only()
-    async def withdraw(self, ctx, amount: int):
-        id = ctx.guild.id
-        path_users = 'cogs/json_data/{}/users.json'.format(id)
-        path_bank = 'cogs/json_data/{}/bank.json'.format(id)
-        user = ctx.author
-        await update_data('bank', user, id)
-        users = await open_json(path_users)
-        bank = await open_json(path_bank)
-        if bank[f'{user.id}']['amount'] - amount >= 0:
-            bank[f'{user.id}']['amount'] -= amount
-            users[f'{user.id}']['cookies'] += amount 
-            embed = discord.Embed(title='Чек', color=0xff5555)
-            embed.add_field(name='**Сумма:**', value=amount, inline=False)
-            embed.add_field(name='**Налог:**', value=0, inline=False) 
-            await ctx.reply(embed=embed)
-        await save_data(users, path_users)
-        await save_data(bank, path_bank)
+    async def withdraw(self, ctx: commands.Context, amount: int):
+        request = requests.get(settings.get('api')+f'guilds/{ctx.guild.id}')
+        if not request.json().get('setting_plugin_economy'):
+            return
+        if amount <= 0:
+            return await ctx.reply('Хорошая попытка ограбить банк, но увы...')
+        request = requests.get(settings.get('api')+f'{ctx.guild.id}/{ctx.author.id}')
+        if request.json().get('bank') < amount:
+            return await ctx.reply('Извините меня, но у вас нет такой суммы на вашем банковском счёте.')
+        context = {
+            'balance': request.json().get('balance') + amount,
+            'bank': request.json().get('bank') - amount
+        }
+        requests.put(settings.get('api')+f'{ctx.guild.id}/{ctx.author.id}', data=context)
+        embed = discord.Embed(title='Чек', color=0xff5555)
+        embed.add_field(name='**Сумма:**', value=amount, inline=False)
+        return await ctx.reply(embed=embed)
 
-    @commands.command(aliases=['bal','balance','ebal'],description="Посмотреть выписку из банка о счете")
+    @commands.command(aliases=['ebal'], description="Посмотреть выписку из банка о счете")
+    @commands.cooldown(1, settings.get('cooldown_medium'), commands.BucketType.user)
     @commands.guild_only()
-    async def bank(self, ctx):
-        id = ctx.guild.id
-        path_users = 'cogs/json_data/{}/users.json'.format(id)
-        path_bank = 'cogs/json_data/{}/bank.json'.format(id)
-        user = ctx.author
-        await update_data('bank', user, id)
-        users = await open_json(path_users)
-        bank = await open_json(path_bank)
-        embed = discord.Embed(title='Выписка из банка', color=0xff5555)
-        embed.set_footer(text=user.name, icon_url=user.avatar_url)
-        embed.add_field(name='**В банке:**', value=bank[f'{user.id}']['amount'])
-        embed.add_field(name='**В кармане:**', value=users[f'{user.id}']['cookies'], inline=False)
-        await ctx.reply(embed=embed)
+    async def bank(self, ctx: commands.Context):
+        request = requests.get(settings.get('api')+f'guilds/{ctx.guild.id}')
+        if not request.json().get('setting_plugin_economy'):
+            return
+        request = requests.get(settings.get('api')+f'{ctx.guild.id}/{ctx.author.id}')
+        embed = discord.Embed(title='Выписка из банка', color=0x2C2F33)
+        embed.add_field(name='**Банк**', value='```' + str(request.json().get('bank')) + '```', inline=True)
+        embed.add_field(name='**Карман**', value='```' + str(request.json().get('balance')) + '```', inline=True)
+        return await ctx.reply(embed=embed)
 
 def setup(bot):
     bot.add_cog(BankSystem(bot))
