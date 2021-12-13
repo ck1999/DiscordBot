@@ -1,0 +1,12 @@
+services:
+    bot:
+        build: .
+        command: ["python3", "DiscordBot/main.py"]
+        depends_on: [server]
+    lavalink:
+        image: fredboat/lavalink:d648861a
+        expose: [2333]
+    server:
+        image: python:3.9
+        build: .
+        command: ["python3", "Server/manage.py", "runserver"]

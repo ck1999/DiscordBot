@@ -1,0 +1,22 @@
+import re
+MAIN_TOKEN = 'NzA0NDU0NDUwMzg2ODI5NTQz.XqdYVQ.ZLQgboB9OUMP5jFF99PgDCqADmA'
+API = 'http://127.0.0.1:8000/api/'
+
+# COOLDOWNS
+
+COOLDOWN_CLASSIC = 5
+COOLDOWN_MEDIUM = 60
+COOLDOWN_LARGE = 300
+COOLDOWN_EXTRA = 86400
+SLEEP = 600
+
+# INFO
+
+TICKETS = 908600066141466624
+LOGS = 858772227326869575
+
+# MUSIC
+RURL = re.compile(r'https?://(?:www\.)?.+')
+SPOTIFY_RURL = re.compile(r'https?://open.spotify.com/(?P<type>album|playlist|track)/(?P<id>[a-zA-Z0-9]+)')
+SPOTIFY_CLIENT_ID = '06fc42d8b2214cf187d701a388bab2dc'
+SPOTIFY_SECRET = 'a58e84c30ec34ffe8ec834885a391c3c'

@@ -1,0 +1,14 @@
+{% include "head.html" %}
+<div class="col-sm-4 position-absolute top-50 start-50 translate-middle">
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">{{ user.tag }}</h5>
+            <p class="card-text">Admin: {{ user.is_staff }}</p>
+            <p class="card-text">Discord ID: {{ user.user_id }}</p>
+            {% for guild in guilds %}
+            <p class="card-text">Guild id: {{ guild.guild }}</p>
+            {% endfor %}
+            <a href="#" class="btn btn-outline-danger">Удалить</a>
+        </div>
+    </div>
+</div>

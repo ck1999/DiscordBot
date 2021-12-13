@@ -1,0 +1,5 @@
+API_ENDPOINT = 'https://discord.com/api/v8'
+CLIENT_ID = '704454450386829543'
+CLIENT_SECRET = '18WIW0SzkT62-55ku6eVRjOAjl1gy6jy'
+REDIRECT_URI = 'http://localhost:8000/'
+DISCORD_OAUTH = 'https://discord.com/api/oauth2/authorize?client_id=704454450386829543&redirect_uri=http%3A%2F%2Flocalhost%3A8000%2F&response_type=code&scope=identify%20guilds'

@@ -1,6 +1,6 @@
-import discord, time, requests
+import discord, time
 from discord.ext import commands
-from .settings import settings
+from config import COOLDOWN_LARGE
 
 class Birthday(commands.Cog):
 
@@ -74,22 +74,28 @@ class RankSystem(commands.Cog, name='Уровни'):
             'level': 1,
             'xp_time_lock': time.time()
         }
-        request = requests.post(settings.get('api')+f'{member.guild.id}', data=context)
+        await self.bot.connector.post_data(f'{member.guild.id}', data=context)
         
+    async def cog_check(self, ctx: commands.Context):
+        response = await self.bot.connector.get_data(f'guilds/{ctx.guild.id}', True)
+        return response.get('setting_plugin_rank')
 
     @commands.Cog.listener()
     async def on_message(self, message: str):
-        if message.guild is None or message.content.startswith('!') or message.author.bot:
+        if not message.guild:
             return
-        request = requests.get(settings.get('api')+f'guilds/{message.guild.id}')
-        if not request.json().get('setting_plugin_rank'):
+        response = await self.bot.connector.get_data(f'guilds/{message.guild.id}', True)
+        try:
+            if message.author.bot or not response.get('setting_plugin_rank') or message.content.startswith(response.get('prefix')):
+                return
+        except:
             return
-        request = requests.get(settings.get('api')+f'{message.guild.id}/{message.author.id}')
-        time_diff = time.time() - request.json().get('xp_time_lock')
+        response = await self.bot.connector.get_data(f'{message.guild.id}/{message.author.id}')
+        time_diff = time.time() - response.get('xp_time_lock')
         if time_diff >= 5:
-            __exp = request.json().get('exp') + 5
-            __level = request.json().get('level')
-            __cookies = request.json().get('balance')
+            __exp = response.get('exp') + 5
+            __level = response.get('level')
+            __cookies = response.get('balance')
             if __exp**(1/4) > __level:
                 __level += 1
                 __cookies += __level*10
@@ -100,18 +106,15 @@ class RankSystem(commands.Cog, name='Уровни'):
                 'balance': __cookies,
                 'xp_time_lock': time.time()
             }
-            request = requests.put(settings.get('api')+f'{message.guild.id}/{message.author.id}', data=context)
+            await self.bot.connector.put_data(f'{message.guild.id}/{message.author.id}', data=context)
 
     @commands.command(description="Информация об уровне\nПримеры команд:\n!level\n!level @ck1999")
-    @commands.cooldown(1, settings.get('cooldown_large'), commands.BucketType.user)
+    @commands.cooldown(1, COOLDOWN_LARGE, commands.BucketType.user)
     @commands.guild_only()
     async def level(self, ctx, member: discord.Member = None):
-        request = requests.get(settings.get('api')+f'guilds/{ctx.guild.id}')
-        if not request.json().get('setting_plugin_rank'):
-            return 0
         user = member or ctx.message.author
-        request = requests.get(settings.get('api')+f'{ctx.guild.id}/{user.id}')
-        await ctx.send('У {} уже {} уровень!'.format(user.mention, request.json().get('level')))
+        response = await self.bot.connector.get_data(f'{ctx.guild.id}/{user.id}')
+        await ctx.send(f"У {user.mention} уже {response.get('level')} уровень!")
 
 def setup(bot):
     bot.add_cog(RankSystem(bot))

@@ -1,6 +1,7 @@
-import discord, requests
+import discord
 from discord.ext import commands
-from .settings import settings
+from config import COOLDOWN_LARGE
+from utils.a_classes import AFor
 
 def get_top_experience(data):
     users = []
@@ -42,15 +43,15 @@ class LeaderboardSystem(commands.Cog, name='Система уровней'):
     def __init__(self, bot):
         self.bot = bot
 
+    async def cog_check(self, ctx: commands.Context):
+        response = await self.bot.connector.get_data(f'guilds/{ctx.guild.id}', True)
+        return response.get('setting_plugin_rank')
+
     @commands.command(description="Топ района по опыту и фисташкам")
-    @commands.cooldown(1, settings.get('cooldown_large'), commands.BucketType.user)
+    @commands.cooldown(1, COOLDOWN_LARGE, commands.BucketType.user)
     @commands.guild_only()
     async def leaderboard(self, ctx):
-        request = requests.get(settings.get('api')+f'guilds/{ctx.guild.id}')
-        if not request.json().get('setting_plugin_rank'):
-            return
-        request = requests.get(settings.get('api')+f'{ctx.guild.id}')
-        users = request.json()
+        users = await self.bot.connector.get_data(f'{ctx.guild.id}')
         leaderboard = get_top_experience(users)
         embed = discord.Embed(title='Топ по опыту', color=0xff5555)
         for i in range(len(leaderboard[:5])):
@@ -63,24 +64,19 @@ class LeaderboardSystem(commands.Cog, name='Система уровней'):
         await ctx.send(embed=embed)
 
     @commands.command(description="Место в таблице лидеров по опыту")
-    @commands.cooldown(1, settings.get('cooldown_large'), commands.BucketType.user)
+    @commands.cooldown(1, COOLDOWN_LARGE, commands.BucketType.user)
     @commands.guild_only()
     async def rank(self, ctx, member: discord.Member = None):
-        request = requests.get(settings.get('api')+f'guilds/{ctx.guild.id}')
-        if not request.json().get('setting_plugin_rank'):
-            return
-        request = requests.get(settings.get('api')+f'{ctx.guild.id}')
-        users = request.json()
+        users = await self.bot.connector.get_data(f'{ctx.guild.id}')
         user = member or ctx.author
         leaderboard = get_top_experience(users)
-        for k in range(len(leaderboard)):
+        async for k in AFor(0, len(leaderboard), 1):
             if leaderboard[k].get_user() == str(user.id):
                 await ctx.reply(f'{user.mention} занимает {k+1} по опыту!')
         leaderboard = get_top_cookies(users)
-        for k in range(len(leaderboard)):
+        async for k in AFor(0, len(leaderboard), 1):
             if leaderboard[k].get_user() == str(user.id):
                 await ctx.reply(f'{user.mention} занимает {k+1} по фисташкам!')
-
 
 def setup(bot):
     bot.add_cog(LeaderboardSystem(bot))

@@ -1,0 +1,16 @@
+{% include "head.html" %}
+<div class="row px-5 py-3" style="margin-right: 0">
+
+      {% for user in users %}
+      <div class="col-sm-3">
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title">{{ user.tag }}</h5>
+            <p class="card-text">{{ user.user_id }}</p>
+            {# <a href="/worker/{{ w.id }}" class="btn btn-primary stretched-link">Подробнее</a> #}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+
+</div>
